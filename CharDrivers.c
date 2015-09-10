@@ -5,6 +5,7 @@
 #include <linux/uaccess.h>   /* copy_to/from_user*/
 #include <linux/string.h>    /* strlen */
 #include <linux/kernel.h>    /* min/max */
+#include <linux/device.h>    /* device */
 
 /* 
  * Another special macro (MODULE_LICENSE) is used to tell the kernel that this 
@@ -98,6 +99,10 @@ static const struct file_operations fops = {
 	.write = fops_write,
 };
 
+static struct device embest_char_dev = {
+	.init_name = "embest_char_dev",
+};
+
 static int __init hello_init(void)
 {
 	int ret;
@@ -131,8 +136,19 @@ static int __init hello_init(void)
 	/*If all above successful, you can get Major num from /proc/devices, then use mknod to create device node*/
 	printk(KERN_ALERT "register char driver successful\n");
 	
+	/*Auto create device node, the node is /dev/embest_char_dev */
+	embest_char_dev.devt = dev_id;
+	ret = device_register(&embest_char_dev);
+	if (ret) {
+		printk(KERN_ERR "device_register embest_char_dev error %d\n", ret);
+		goto device_register_err;
+	}
+	
+	printk(KERN_ALERT "device_register embest_char_dev successful\n");
+	
 	return ret;
-
+	
+device_register_err:
 cdev_add_err:
 	cdev_del(embest_cdev);
 cdev_alloc_err:
@@ -143,6 +159,7 @@ alloc_chrdev_region_err:
 
 static void hello_exit(void)
 {
+	device_unregister(&embest_char_dev);
 	cdev_del(embest_cdev);
 	unregister_chrdev_region(embest_cdev->dev, 1);
 	
